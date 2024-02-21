@@ -1,5 +1,6 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
+import generateTokenAndSetCookie from "../utils/generateToken.js";
 
 
 
@@ -43,6 +44,7 @@ export const signup = async (req, res) => {
 
         if(newUser) {
             // generate jwt token
+            generateTokenAndSetCookie(newUser._id, res);
             await newUser.save();
         } else {
             res.status(400).json({error: "Invalid User Data" })
@@ -54,10 +56,87 @@ export const signup = async (req, res) => {
     }
     // res.send("Signup Route")
 }
-export const login = (req, res) => {
-    res.send("Login Route")
+
+
+
+export const login = async (req, res) => {
+    try {
+		const { username, password } = req.body;
+		const user = await User.findOne({ username });
+		const isPasswordCorrect = await bcrypt.compare(password, user?.password || "");
+
+		if (!user || !isPasswordCorrect) {
+			return res.status(400).json({ error: "Invalid Credentials" });
+		}
+
+		generateTokenAndSetCookie(user._id, res);
+
+		res.status(200).json({
+			_id: user._id,
+			fullName: user.fullName,
+			username: user.username,
+			profilePic: user.profilePic,
+		});
+	} catch (error) {
+		console.log("Error in login controller", error.message);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
 }
-export const logout = (req, res) => {
-    res.send("Logout Route")
+
+
+// export const google = async (req, res, next) => {
+//     const { name, email, googlePhotoUrl } = req.body;
+//     try {
+//         const user = await User.findOne({ email });
+//         if (user) {
+//           const token = jwt.sign(
+//             { id: user._id, isAdmin: user.isAdmin },
+//             process.env.JWT_SECRET
+//           );
+//           const { password, ...rest } = user._doc;
+//           res
+//             .status(200)
+//             .cookie('access_token', token, {
+//               httpOnly: true,
+//             })
+//             .json(rest);
+//         } else {
+//             const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+//             const hashedPassword = bcryptjs.hashSync(generatedPassword, 12)
+//             const newUser = new User ({
+//                 username: name.toLowerCase().split(' ').join('') + Math.random().toString(9).slice(-4),
+//                 email,
+//                 password: hashedPassword,
+//                 profilePicture: googlePhotoUrl,
+//             });
+//             await newUser.save();
+//             const token = jwt.sign(
+//                 { id: newUser._id, isAdmin: newUser.isAdmin }, 
+//                 process.env.JWT_SECRET
+//             );
+//             const { password, ...rest } = newUser._doc;
+//             res 
+//               .status(200)
+//               .cookie('acccess_token', token, {
+//                 httpOnly: true,
+//               })
+//               .json(rest)
+            
+
+//         }
+//     } catch (error) {
+        
+//     }
+// }
+
+
+export const logout = async (req, res) => {
+    try {
+		res.cookie("jwt", "", { maxAge: 0 });
+		res.status(200).json({ message: "Logged out successfully" });
+	} catch (error) {
+		console.log("Error in logout controller", error.message);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
 }
 
